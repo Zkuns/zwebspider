@@ -1,0 +1,4 @@
+#!/usr/bin/env ruby
+require 'zweb_spider/cli'
+
+Zweb_spider::run
