@@ -1,38 +1,45 @@
 require 'thread'
-require 'decoder'
-
+require './decoder'
+require 'pry'
 class ThreadPool
   def initialize (num = 4, url, stackdeep)
-    @lock = Mutex.new
-    @queue = Queue.new
-    @queueb = Queue.new
-    @decoder = Decoder.new
+    @base_url = url
+    @lock1 = Mutex.new
+    @lock2 = Mutex.new
+    @queue = [url, -1]
+    @queueb = Array.new
+    @decoder = Decoder.new(0)
     @stackdeep = stackdeep
-    @queue << url
-    @threads = (0..num).map do
+    @parseover = false
+    @threads = (0...num).map do
       Thread.new do
-        begin
+        # begin
           while true
             links = get_from_queue
             sleep if links == []
             links.each do |link|
-              import_to_queue(@decoder.parse link)
+              if link == -1
+                @stackdeep -= 1
+                change_queue
+                @parseover = true
+                next
+              end
+              import_to_queue(@decoder.parse(link))
             end
           end
-        rescue Exception => e
-          puts e
-        end
+        # rescue Exception => e
+        #   puts e
+        # end
       end
     end
   end
 
-  def join
+  def run
     @threads.each(&:run)
     loop do 
-      if check_finish?
+      if @parseover
         return if @stackdeep == 0
-        @stackdeep -= 1
-        change_queue
+        sleep 1
         wakeup
       end
       sleep 0.1
@@ -47,29 +54,25 @@ class ThreadPool
   
   def change_queue
     @queue = @queueb
-    @queueb = Queue.new
+    @queue << -1
+    @queueb = Array.new
   end
 
   def wakeup
     @threads.each(&:wakeup)
   end
 
-  def check_finish?
-    result = @threads.map do |thread|
-      thread.status == 'sleep'
-    end
-    !result.include?(false)
-  end
-
   def import_to_queue links
-    @lock.synchronize do
-      @queueb << links
+    @lock1.synchronize do
+      links.each do |link|
+        @queueb << (@base_url + link.to_s)
+      end
     end
   end
 
   def get_from_queue
-    @lock.synchronize do
-      @queue[0].shift(5)
+    @lock2.synchronize do
+      @queue.shift(5)
     end
   end
 end

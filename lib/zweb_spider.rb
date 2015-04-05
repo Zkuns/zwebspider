@@ -1,4 +1,5 @@
-require 'zwen_spider/threadpool'
+$LOADPATH.unshift('.')
+require 'threadpool'
 class Spider
 
   def self.search url, keyword
